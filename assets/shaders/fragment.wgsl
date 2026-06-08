@@ -27,5 +27,18 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
 
     let direction = normalize(far - origin);
 
-    return vec4f(direction, 1.0);
+    //ground
+    let ground_normal = vec3f(0.0, 1.0, 0.0);
+    if dot(direction, ground_normal) < -0.00001 {
+        let t = -origin.y / direction.y;
+        let hit_pos = origin + direction * t;
+
+        let green = sin(hit_pos.x * 5) * cos(hit_pos.z * 5) * 0.1 + 0.5;
+
+        return vec4f(0.1, green, 0.1, 1.0);
+    }
+
+    return vec4f(0.1, 0.1, 5.0, 1.0);
+
+
 }

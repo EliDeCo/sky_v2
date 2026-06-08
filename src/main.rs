@@ -35,5 +35,5 @@ fn main() {
 
 
 fn setup(mut commands: Commands) {
-    commands.spawn((Camera3d::default(), Msaa::Off, FlyCam));
+    commands.spawn((Camera3d::default(), Msaa::Off, FlyCam, Transform::from_xyz(0.0, 10.0, 0.0)));
 }
