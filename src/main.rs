@@ -1,8 +1,10 @@
 use bevy::prelude::*;
 use bevy_flycam::prelude::*;
+use bevy_fragment_shader_plugin::prelude::*;
 
 fn main() {
     App::new()
+        //camera
         .add_plugins((DefaultPlugins, NoCameraPlayerPlugin))
         .insert_resource(MovementSettings {
             sensitivity: 0.00007,
@@ -13,6 +15,10 @@ fn main() {
             move_descend: KeyCode::KeyQ,
             ..Default::default()
         })
+
+        //shader
+        .add_plugins(FullscreenFragmentPlugin::new("shaders/fragment.wgsl"))
+
         .add_systems(Startup, setup)
         .run();
 }
@@ -48,6 +54,7 @@ fn setup(
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Msaa::Off,
         FlyCam
     ));
     

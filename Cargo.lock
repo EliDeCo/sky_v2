@@ -347,6 +347,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy-fragment-shader-plugin"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bb208a6e291455b43ab349e61bf36af84a1ec523041facbac8880edb1cc16fc"
+dependencies = [
+ "bevy",
+ "encase",
+ "wgpu",
+]
+
+[[package]]
 name = "bevy_a11y"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1440,15 +1451,6 @@ dependencies = [
  "futures-lite",
  "heapless",
  "pin-project",
-]
-
-[[package]]
-name = "bevy_template"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_flycam",
- "log",
 ]
 
 [[package]]
@@ -4509,6 +4511,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sky_1"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy-fragment-shader-plugin",
+ "bevy_flycam",
+ "log",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5280,12 +5292,14 @@ dependencies = [
  "js-sys",
  "log",
  "naga",
+ "parking_lot",
  "portable-atomic",
  "profiling",
  "raw-window-handle",
  "smallvec",
  "static_assertions",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
  "wgpu-core",
  "wgpu-hal",
@@ -5318,6 +5332,7 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.18",
  "wgpu-core-deps-apple",
+ "wgpu-core-deps-emscripten",
  "wgpu-core-deps-wasm",
  "wgpu-core-deps-windows-linux-android",
  "wgpu-hal",
@@ -5329,6 +5344,15 @@ name = "wgpu-core-deps-apple"
 version = "27.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0772ae958e9be0c729561d5e3fd9a19679bcdfb945b8b1a1969d9bfe8056d233"
+dependencies = [
+ "wgpu-hal",
+]
+
+[[package]]
+name = "wgpu-core-deps-emscripten"
+version = "27.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b06ac3444a95b0813ecfd81ddb2774b66220b264b3e2031152a4a29fda4da6b5"
 dependencies = [
  "wgpu-hal",
 ]
