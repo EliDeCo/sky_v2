@@ -4172,6 +4172,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
+name = "ray_template"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy-fragment-shader-plugin",
+ "bevy_flycam",
+ "log",
+]
+
+[[package]]
 name = "read-fonts"
 version = "0.36.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4508,16 +4518,6 @@ checksum = "7fbdfe3d2475fbd7ddd1f3e5cf8288a30eb3e5f95832829570cd88115a7434ac"
 dependencies = [
  "bytemuck",
  "read-fonts 0.37.0",
-]
-
-[[package]]
-name = "sky_1"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy-fragment-shader-plugin",
- "bevy_flycam",
- "log",
 ]
 
 [[package]]
