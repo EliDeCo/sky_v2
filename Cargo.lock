@@ -347,6 +347,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy-fps-counter"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fc1ff0aa37ee796816048391b58900dab94e874a2a73d24f50de50ca99c5a6f"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "bevy-fragment-shader-plugin"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4515,6 +4524,7 @@ name = "sky_1"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy-fps-counter",
  "bevy-fragment-shader-plugin",
  "bevy_flycam",
  "log",
