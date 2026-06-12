@@ -48,6 +48,7 @@ fn toggle_vsync(
             PresentMode::AutoVsync => PresentMode::AutoNoVsync,
             PresentMode::AutoNoVsync => PresentMode::AutoVsync,
             _ => PresentMode::AutoVsync,
-        }
+        };
+        info!("Toggled VSync: {:?}", window.present_mode);
     }
 }

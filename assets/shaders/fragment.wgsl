@@ -1,6 +1,6 @@
     const ATMOSPHERE_HEIGHT: f32 = 100000.0; 
-    const NUM_RAYLEIGH_STEPS: i32 = 80;
-    const NUM_OPTICAL_DEPTH_STEPS: i32 = 80;
+    const NUM_RAYLEIGH_STEPS: i32 = 16;
+    const NUM_OPTICAL_DEPTH_STEPS: i32 = 16;
     const SUN_DIRECTION = vec3f(0.0, 1.0, 0.0); //make sure this is normalized
     const PLANET_CENTER = vec3f(0.0, -6378000.0, 0.0);
     const PLANET_RADIUS = 6378000.0;
@@ -119,9 +119,15 @@ fn ray_sphere(origin: vec3f, dir: vec3f, center: vec3f, radius: f32) -> vec2f {
         return vec2f(-1.0, -1.0);
     }
     let sqrt_d = sqrt(discriminant);
-    let t0 = (-b - sqrt_d) / (2.0 * a);
-    let t1 = (-b + sqrt_d) / (2.0 * a);
-    return vec2f(t0, t1);
+    let s = select(1.0, -1.0, b < 0.0); // s = -1 if b<0, else +1
+    let q = -0.5 * (b + s * sqrt_d);
+    if q == 0.0 { //double root
+        return vec2f(-b/(2*a));
+    } else {
+        let t0 = q / a;
+        let t1 = c / q;
+        return vec2f(min(t0, t1), max(t0, t1));
+    }
 }
 
 //calculates the optical depth along a ray, essentially the average density across the ray
