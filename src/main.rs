@@ -12,7 +12,7 @@ fn main() {
         .add_plugins((DefaultPlugins, NoCameraPlayerPlugin))
         .insert_resource(MovementSettings {
             sensitivity: 0.00007,
-            speed: 10.0,
+            speed: 10000.0,
         })
         .insert_resource(KeyBindings {
             move_ascend: KeyCode::KeyE,

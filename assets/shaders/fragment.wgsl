@@ -1,8 +1,7 @@
     const ATMOSPHERE_HEIGHT: f32 = 100000.0; 
-    const NUM_RAYLEIGH_STEPS: i32 = 24;
-    const NUM_OPTICAL_DEPTH_STEPS: i32 = 24;
-    const SUN_DIRECTION = vec3f(0.0, -1.0, 0.0); //make sure this is normalized
-    const INV_SUN_DIRECTION: vec3f = -SUN_DIRECTION;
+    const NUM_RAYLEIGH_STEPS: i32 = 80;
+    const NUM_OPTICAL_DEPTH_STEPS: i32 = 80;
+    const SUN_DIRECTION = vec3f(0.0, 1.0, 0.0); //make sure this is normalized
     const PLANET_CENTER = vec3f(0.0, -6378000.0, 0.0);
     const PLANET_RADIUS = 6378000.0;
     const ATMOSPHERE_RADIUS = PLANET_RADIUS + ATMOSPHERE_HEIGHT;
@@ -46,34 +45,44 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
 
         
     //sky
-    var start_point = ray_origin;
-    let intersections = ray_sphere(ray_origin, ray_dir, PLANET_CENTER, ATMOSPHERE_RADIUS);
-    //if outside atmosphere, start where ray enters atmosphere
-    if length(ray_origin - PLANET_CENTER) > ATMOSPHERE_RADIUS {
-        start_point = ray_origin + ray_dir * intersections.x;
+    let atmosphere_intersections = ray_sphere(ray_origin, ray_dir, PLANET_CENTER, ATMOSPHERE_RADIUS);
+    // atmosphere is missed entirely, render space
+    if all(atmosphere_intersections == vec2f(-1.0, -1.0)) {
+        return vec4f(SPACE_COLOR, 1.0);
     }
-    var dist_through_atmosphere = intersections.y - max(intersections.x, 0.0);
+    var start_point = ray_origin;
+    let outside_atmosphere = length(ray_origin - PLANET_CENTER) > ATMOSPHERE_RADIUS;
+    //if ray starts outside atmosphere, move start point to entry point
+    if outside_atmosphere {
+        start_point = ray_origin + ray_dir * atmosphere_intersections.x;
+    }
+    var dist_through_atmosphere = atmosphere_intersections.y - max(atmosphere_intersections.x, 0.0);
     var background_color = SPACE_COLOR;
-    let t = ray_sphere(ray_origin, ray_dir, PLANET_CENTER, PLANET_RADIUS);
-    if t.x > 0.0 {
-        //hits ground before leaving atmosphere
-        dist_through_atmosphere = min(dist_through_atmosphere, t.x);
-        let hit_point = ray_origin + ray_dir * t.x;
+    let planet_intersections = ray_sphere(ray_origin, ray_dir, PLANET_CENTER, PLANET_RADIUS);
+    let hits_planet = planet_intersections.x > 0.0;
+    if hits_planet {
+        if outside_atmosphere { //if the ray starts outside the atmosphere and hits the planet, the distance through the atmosphere is the difference between the distances to the atmosphere and the planet surface
+            dist_through_atmosphere = planet_intersections.x - atmosphere_intersections.x;
+        } else { // if the ray starts inside the atmosphere, we need to check if it hits the planet before exiting the atmosphere
+            dist_through_atmosphere = min(dist_through_atmosphere, planet_intersections.x);
+
+        }
+        let hit_point = ray_origin + ray_dir * planet_intersections.x;
         let normal    = normalize(hit_point - PLANET_CENTER);
         let diffuse   = max(dot(normal, SUN_DIRECTION), 0.0);
         background_color = GRASS_COLOR * (AMBIENT + diffuse);  
     }
 
-    let phase = rayleigh_phase(dot(ray_dir, SUN_DIRECTION));
+    let phase = rayleigh_phase(dot(ray_dir, -SUN_DIRECTION));
     var inscattered_light = calculate_light(start_point, ray_dir, dist_through_atmosphere);
     inscattered_light *= RAYLEIGH_BETA * phase * SUN_INTENSITY;
 
-    let view_ray_optical_depth = optical_depth(ray_origin, ray_dir, dist_through_atmosphere);
+    let view_ray_optical_depth = optical_depth(start_point, ray_dir, dist_through_atmosphere);
     let total_view_ray_transmittance = exp(-RAYLEIGH_BETA * view_ray_optical_depth);
 
     let final_color = background_color * total_view_ray_transmittance + inscattered_light;
 
-    return vec4f(final_color, 1.0);
+    return vec4f(tonemap(final_color), 1.0);
 
 }
 
@@ -86,8 +95,8 @@ fn calculate_light(ray_origin: vec3f, ray_dir: vec3f, dist_through_atmosphere: f
 
     //try to replace with integral
     for (var i = 0; i < NUM_RAYLEIGH_STEPS; i += 1) {
-        let sun_ray_length = ray_sphere(scatter_point, INV_SUN_DIRECTION, PLANET_CENTER, ATMOSPHERE_RADIUS).y;
-        let sun_ray_optical_depth = optical_depth(scatter_point, INV_SUN_DIRECTION, sun_ray_length);
+        let sun_ray_length = ray_sphere(scatter_point, SUN_DIRECTION, PLANET_CENTER, ATMOSPHERE_RADIUS).y;
+        let sun_ray_optical_depth = optical_depth(scatter_point, SUN_DIRECTION, sun_ray_length);
         let view_ray_optical_depth = optical_depth(ray_origin, ray_dir, step_size * f32(i));
         let transmittance = exp(-RAYLEIGH_BETA * (sun_ray_optical_depth + view_ray_optical_depth));
         let local_density = rayleigh_density(scatter_point);
