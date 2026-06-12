@@ -1,3 +1,19 @@
+    const ATMOSPHERE_HEIGHT: f32 = 100000.0; 
+    const NUM_RAYLEIGH_STEPS: i32 = 24;
+    const NUM_OPTICAL_DEPTH_STEPS: i32 = 24;
+    const SUN_DIRECTION = vec3f(0.0, -1.0, 0.0); //make sure this is normalized
+    const INV_SUN_DIRECTION: vec3f = -SUN_DIRECTION;
+    const PLANET_CENTER = vec3f(0.0, -6378000.0, 0.0);
+    const PLANET_RADIUS = 6378000.0;
+    const ATMOSPHERE_RADIUS = PLANET_RADIUS + ATMOSPHERE_HEIGHT;
+    const GRASS_COLOR = vec3f(0.196, 0.459, 0.145);
+    const AMBIENT     = 0.1;
+    const SCALE_HEIGHT = 8000.0;
+    const SPACE_COLOR = vec3f(0.0, 0.0, 0.0);
+    const RAYLEIGH_BETA = vec3f(5.8e-6, 13.5e-6, 33.1e-6);
+    const SUN_INTENSITY = 20.0;
+
+
 struct Uniform {
     resolution: vec2f,
     world_from_clip: mat4x4f,
@@ -8,9 +24,10 @@ var<uniform> unif: Uniform;
 
 @fragment
 fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32> {
+
+    //Ray setup
     let uv = frag_coords.xy / unif.resolution;
 
-    //normalized device coordinates (flip y)
     let ndc = vec2f(
         uv.x * 2.0 - 1.0,
         1.0 - uv.y * 2.0
@@ -22,48 +39,107 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
     let world_near = unif.world_from_clip * clip_near;
     let world_far  = unif.world_from_clip * clip_far;
 
-    let origin = world_near.xyz / world_near.w;
+    let ray_origin = world_near.xyz / world_near.w;
     let far = world_far.xyz / world_far.w;
 
-    let direction = normalize(far - origin);
+    let ray_dir = normalize(far - ray_origin);
 
-    let light_dir = normalize(vec3f(1.0, 2.0, 1.0));
-    let sky_color   = vec3f(0.529, 0.808, 0.922);
-    let grass_color = vec3f(0.196, 0.459, 0.145);
-    let ambient     = 0.1;
-
-    //ground
-    let sphere_center = vec3f(0.0, -6378000.0, 0.0);
-    let sphere_radius = 6378000.0;
-
-    let t = ray_sphere_intersect(origin, direction, sphere_center, sphere_radius);
-    if t > 0.0 {
-        let hit_point = origin + direction * t;
-        let normal    = normalize(hit_point - sphere_center);
-        let diffuse   = max(dot(normal, light_dir), 0.0);
-        let lit       = grass_color * (ambient + diffuse);
-        return vec4f(lit, 1.0);
-    }
         
     //sky
-    return vec4f(sky_color, 1.0);
+    var start_point = ray_origin;
+    let intersections = ray_sphere(ray_origin, ray_dir, PLANET_CENTER, ATMOSPHERE_RADIUS);
+    //if outside atmosphere, start where ray enters atmosphere
+    if length(ray_origin - PLANET_CENTER) > ATMOSPHERE_RADIUS {
+        start_point = ray_origin + ray_dir * intersections.x;
+    }
+    var dist_through_atmosphere = intersections.y - max(intersections.x, 0.0);
+    var background_color = SPACE_COLOR;
+    let t = ray_sphere(ray_origin, ray_dir, PLANET_CENTER, PLANET_RADIUS);
+    if t.x > 0.0 {
+        //hits ground before leaving atmosphere
+        dist_through_atmosphere = min(dist_through_atmosphere, t.x);
+        let hit_point = ray_origin + ray_dir * t.x;
+        let normal    = normalize(hit_point - PLANET_CENTER);
+        let diffuse   = max(dot(normal, SUN_DIRECTION), 0.0);
+        background_color = GRASS_COLOR * (AMBIENT + diffuse);  
+    }
+
+    let phase = rayleigh_phase(dot(ray_dir, SUN_DIRECTION));
+    var inscattered_light = calculate_light(start_point, ray_dir, dist_through_atmosphere);
+    inscattered_light *= RAYLEIGH_BETA * phase * SUN_INTENSITY;
+
+    let view_ray_optical_depth = optical_depth(ray_origin, ray_dir, dist_through_atmosphere);
+    let total_view_ray_transmittance = exp(-RAYLEIGH_BETA * view_ray_optical_depth);
+
+    let final_color = background_color * total_view_ray_transmittance + inscattered_light;
+
+    return vec4f(final_color, 1.0);
 
 }
 
-// Returns the distance to the nearest positive hit, or -1.0 on miss.
-fn ray_sphere_intersect(origin: vec3f, dir: vec3f, center: vec3f, radius: f32) -> f32 {
+
+fn calculate_light(ray_origin: vec3f, ray_dir: vec3f, dist_through_atmosphere: f32) -> vec3f {
+    let step_size = dist_through_atmosphere / f32(NUM_RAYLEIGH_STEPS);
+    var scatter_point = ray_origin;
+    var color = vec3f(0);
+    var inscattered_light = vec3f(0);
+
+    //try to replace with integral
+    for (var i = 0; i < NUM_RAYLEIGH_STEPS; i += 1) {
+        let sun_ray_length = ray_sphere(scatter_point, INV_SUN_DIRECTION, PLANET_CENTER, ATMOSPHERE_RADIUS).y;
+        let sun_ray_optical_depth = optical_depth(scatter_point, INV_SUN_DIRECTION, sun_ray_length);
+        let view_ray_optical_depth = optical_depth(ray_origin, ray_dir, step_size * f32(i));
+        let transmittance = exp(-RAYLEIGH_BETA * (sun_ray_optical_depth + view_ray_optical_depth));
+        let local_density = rayleigh_density(scatter_point);
+
+        inscattered_light += local_density * transmittance * step_size;
+        scatter_point += ray_dir * step_size;
+    }
+
+    return inscattered_light;
+} 
+
+// Returns vec2(t_enter, t_exit). On miss, both components are -1.0.
+fn ray_sphere(origin: vec3f, dir: vec3f, center: vec3f, radius: f32) -> vec2f {
     let oc = origin - center;
     let a  = dot(dir, dir);
     let b  = 2.0 * dot(oc, dir);
     let c  = dot(oc, oc) - radius * radius;
     let discriminant = b * b - 4.0 * a * c;
     if discriminant < 0.0 {
-        return -1.0;
+        return vec2f(-1.0, -1.0);
     }
     let sqrt_d = sqrt(discriminant);
     let t0 = (-b - sqrt_d) / (2.0 * a);
     let t1 = (-b + sqrt_d) / (2.0 * a);
-    if t0 > 0.0 { return t0; }
-    if t1 > 0.0 { return t1; }
-    return -1.0;
+    return vec2f(t0, t1);
+}
+
+//calculates the optical depth along a ray, essentially the average density across the ray
+fn optical_depth(origin: vec3f, dir: vec3f, ray_length: f32) -> f32 {
+    var sample_point = origin;
+    let step_size = ray_length / f32(NUM_OPTICAL_DEPTH_STEPS);
+    var optical_depth = 0.0;
+
+    //this can also likely be replaced with an integral
+    for (var i = 0; i < NUM_OPTICAL_DEPTH_STEPS; i += 1) {
+        optical_depth += rayleigh_density(sample_point) * step_size;
+        sample_point += dir * step_size;
+    }
+
+    return optical_depth;
+}
+
+//calculates the density of the atmosphere at a given point for use in rayleigh scattering.
+fn rayleigh_density(point: vec3f) -> f32 {
+    let height = length(point - PLANET_CENTER) - PLANET_RADIUS;
+    return exp(-max(0.0, height) / SCALE_HEIGHT);
+}
+
+fn rayleigh_phase(cos_theta: f32) -> f32 {
+    return (3.0 / (16.0 * 3.14159)) * (1.0 + cos_theta * cos_theta);
+}
+
+fn tonemap(color: vec3f) -> vec3f {
+    return vec3f(1) - exp(-color);
 }
