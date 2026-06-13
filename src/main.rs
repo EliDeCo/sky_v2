@@ -1,10 +1,12 @@
-use bevy::{prelude::*, window::PresentMode};
+use bevy::prelude::*;
 use bevy_flycam::prelude::*;
 use bevy_fps_counter::FpsCounterPlugin;
 use bevy_fragment_shader_plugin::prelude::*;
 
 mod buffers;
 use buffers::*;
+mod ui;
+use ui::PresentModeDropdownPlugin;
 
 fn main() {
     App::new()
@@ -20,13 +22,14 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(FpsCounterPlugin)
+        .add_plugins(PresentModeDropdownPlugin)
         //shader
         .add_plugins(FullscreenFragmentPlugin::new("shaders/fragment.wgsl"))
         .register_uniform_buffer::<Uniform>(0, 0)
         .init_resource::<Uniform>()
         //run
         .add_systems(Startup, setup)
-        .add_systems(Update, (update_uniform, toggle_vsync))
+        .add_systems(Update, update_uniform)
         .run();
 }
 
@@ -39,16 +42,3 @@ fn setup(mut commands: Commands) {
     ));
 }
 
-fn toggle_vsync(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut window: Single<&mut Window, With<PrimaryWindow>>,
-) {
-    if keys.just_pressed(KeyCode::KeyT) {
-        window.present_mode = match window.present_mode {
-            PresentMode::AutoVsync => PresentMode::AutoNoVsync,
-            PresentMode::AutoNoVsync => PresentMode::AutoVsync,
-            _ => PresentMode::AutoVsync,
-        };
-        info!("Toggled VSync: {:?}", window.present_mode);
-    }
-}
