@@ -1,9 +1,9 @@
     const ATMOSPHERE_HEIGHT: f32 = 100000.0; 
-    const NUM_RAYLEIGH_STEPS: i32 = 16;
-    const NUM_OPTICAL_DEPTH_STEPS: i32 = 16;
+    const NUM_RAYLEIGH_STEPS: i32 = 128;
+    const NUM_OPTICAL_DEPTH_STEPS: i32 = 128;
     const SUN_DIRECTION = vec3f(0.0, 1.0, 0.0); //make sure this is normalized
-    const PLANET_CENTER = vec3f(0.0, -6378000.0, 0.0);
     const PLANET_RADIUS = 6378000.0;
+    const PLANET_CENTER = vec3f(0.0, -PLANET_RADIUS, 0.0);
     const ATMOSPHERE_RADIUS = PLANET_RADIUS + ATMOSPHERE_HEIGHT;
     const GRASS_COLOR = vec3f(0.196, 0.459, 0.145);
     const AMBIENT     = 0.1;
@@ -90,18 +90,18 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
 fn calculate_light(ray_origin: vec3f, ray_dir: vec3f, dist_through_atmosphere: f32) -> vec3f {
     let step_size = dist_through_atmosphere / f32(NUM_RAYLEIGH_STEPS);
     var scatter_point = ray_origin;
-    var color = vec3f(0);
     var inscattered_light = vec3f(0);
+    var view_ray_optical_depth = 0.0;
 
     //try to replace with integral
     for (var i = 0; i < NUM_RAYLEIGH_STEPS; i += 1) {
         let sun_ray_length = ray_sphere(scatter_point, SUN_DIRECTION, PLANET_CENTER, ATMOSPHERE_RADIUS).y;
         let sun_ray_optical_depth = optical_depth(scatter_point, SUN_DIRECTION, sun_ray_length);
-        let view_ray_optical_depth = optical_depth(ray_origin, ray_dir, step_size * f32(i));
-        let transmittance = exp(-RAYLEIGH_BETA * (sun_ray_optical_depth + view_ray_optical_depth));
         let local_density = rayleigh_density(scatter_point);
+        let transmittance = exp(-RAYLEIGH_BETA * (sun_ray_optical_depth + view_ray_optical_depth));
 
         inscattered_light += local_density * transmittance * step_size;
+        view_ray_optical_depth += local_density * step_size;
         scatter_point += ray_dir * step_size;
     }
 
