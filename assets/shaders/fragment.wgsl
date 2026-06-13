@@ -1,15 +1,15 @@
-    const ATMOSPHERE_HEIGHT: f32 = 100000.0; 
-    const NUM_RAYLEIGH_STEPS: i32 = 128;
-    const NUM_OPTICAL_DEPTH_STEPS: i32 = 128;
-    const SUN_DIRECTION = vec3f(0.0, 1.0, 0.0); //make sure this is normalized
-    const PLANET_RADIUS = 6378000.0;
+    const ATMOSPHERE_HEIGHT: f32 = 100.0;
+    const NUM_RAYLEIGH_STEPS: i32 = 32;
+    const NUM_OPTICAL_DEPTH_STEPS: i32 = 32;
+    const SUN_DIRECTION = vec3f(0.0, 0.0099995, -0.9999500); //make sure this is normalized
+    const PLANET_RADIUS = 6378.0; 
     const PLANET_CENTER = vec3f(0.0, -PLANET_RADIUS, 0.0);
     const ATMOSPHERE_RADIUS = PLANET_RADIUS + ATMOSPHERE_HEIGHT;
     const GRASS_COLOR = vec3f(0.196, 0.459, 0.145);
     const AMBIENT     = 0.1;
-    const SCALE_HEIGHT = 8000.0;
+    const SCALE_HEIGHT = 8.0;
     const SPACE_COLOR = vec3f(0.0, 0.0, 0.0);
-    const RAYLEIGH_BETA = vec3f(5.8e-6, 13.5e-6, 33.1e-6);
+    const RAYLEIGH_BETA = vec3f(5.8e-3, 13.5e-3, 33.1e-3);
     const SUN_INTENSITY = 20.0;
 
 
@@ -43,7 +43,10 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
 
     let ray_dir = normalize(far - ray_origin);
 
-        
+    let planet = ray_sphere(ray_origin, ray_dir, PLANET_CENTER, PLANET_RADIUS);
+   
+   
+   
     //sky
     let atmosphere_intersections = ray_sphere(ray_origin, ray_dir, PLANET_CENTER, ATMOSPHERE_RADIUS);
     // atmosphere is missed entirely, render space
@@ -83,7 +86,6 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
     let final_color = background_color * total_view_ray_transmittance + inscattered_light;
 
     return vec4f(tonemap(final_color), 1.0);
-
 }
 
 
@@ -111,23 +113,14 @@ fn calculate_light(ray_origin: vec3f, ray_dir: vec3f, dist_through_atmosphere: f
 // Returns vec2(t_enter, t_exit). On miss, both components are -1.0.
 fn ray_sphere(origin: vec3f, dir: vec3f, center: vec3f, radius: f32) -> vec2f {
     let oc = origin - center;
-    let a  = dot(dir, dir);
-    let b  = 2.0 * dot(oc, dir);
-    let c  = dot(oc, oc) - radius * radius;
-    let discriminant = b * b - 4.0 * a * c;
-    if discriminant < 0.0 {
+    let b  = dot(oc, dir);
+    let qc = oc - b * dir;
+    var h  = radius * radius - dot(qc, qc);
+    if h < 0.0 {
         return vec2f(-1.0, -1.0);
     }
-    let sqrt_d = sqrt(discriminant);
-    let s = select(1.0, -1.0, b < 0.0); // s = -1 if b<0, else +1
-    let q = -0.5 * (b + s * sqrt_d);
-    if q == 0.0 { //double root
-        return vec2f(-b/(2*a));
-    } else {
-        let t0 = q / a;
-        let t1 = c / q;
-        return vec2f(min(t0, t1), max(t0, t1));
-    }
+    h = sqrt(h);
+    return vec2f(-b - h, -b + h);
 }
 
 //calculates the optical depth along a ray, essentially the average density across the ray

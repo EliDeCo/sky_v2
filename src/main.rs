@@ -14,7 +14,7 @@ fn main() {
         .add_plugins((DefaultPlugins, NoCameraPlayerPlugin))
         .insert_resource(MovementSettings {
             sensitivity: 0.00007,
-            speed: 10_000.0,
+            speed: 100.0,
         })
         .insert_resource(KeyBindings {
             move_ascend: KeyCode::KeyE,
@@ -38,7 +38,7 @@ fn setup(mut commands: Commands) {
         Camera3d::default(),
         Msaa::Off,
         FlyCam,
-        Transform::from_xyz(0.0, 10.0, 0.0),
+        Transform::from_xyz(0.0, 0.001, 0.0),
     ));
 }
 
