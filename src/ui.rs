@@ -1,6 +1,9 @@
 use bevy::{prelude::*, window::PresentMode, window::PrimaryWindow};
 
 #[derive(Component)]
+struct CoordsText;
+
+#[derive(Component)]
 struct DropdownToggleButton;
 
 #[derive(Component)]
@@ -43,7 +46,7 @@ pub struct PresentModeDropdownPlugin;
 impl Plugin for PresentModeDropdownPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DropdownState>()
-            .add_systems(Startup, spawn_dropdown_ui)
+            .add_systems(Startup, (spawn_dropdown_ui, spawn_coords_text))
             .add_systems(
                 Update,
                 (
@@ -51,6 +54,7 @@ impl Plugin for PresentModeDropdownPlugin {
                     dropdown_option_system,
                     dropdown_backdrop_system,
                     dropdown_hover_highlight,
+                    update_coords_text,
                 ),
             );
     }
@@ -237,5 +241,36 @@ fn dropdown_hover_highlight(
             Interaction::Hovered => Color::srgba(0.25, 0.25, 0.25, 1.0),
             _ => Color::srgba(0.0, 0.0, 0.0, 0.0),
         };
+    }
+}
+
+fn spawn_coords_text(mut commands: Commands) {
+    commands.spawn((
+        CoordsText,
+        Text::new("x: 0.00  y: 0.00  z: 0.00"),
+        TextFont {
+            font_size: 20.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(40.0),
+            left: Val::Px(0.0),
+            ..default()
+        },
+    ));
+}
+
+fn update_coords_text(
+    camera_q: Single<&GlobalTransform, With<Camera3d>>,
+    mut text_q: Query<&mut Text, With<CoordsText>>,
+) {
+    let pos = camera_q.translation();
+    if let Ok(mut text) = text_q.single_mut() {
+        *text = Text::new(format!(
+            "x: {:.2}  y: {:.2}  z: {:.2}",
+            pos.x, pos.y, pos.z
+        ));
     }
 }
