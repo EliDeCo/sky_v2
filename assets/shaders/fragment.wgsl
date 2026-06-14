@@ -97,12 +97,17 @@ fn calculate_light(ray_origin: vec3f, ray_dir: vec3f, dist_through_atmosphere: f
 
     //try to replace with integral
     for (var i = 0; i < NUM_RAYLEIGH_STEPS; i += 1) {
-        let sun_ray_length = ray_sphere(scatter_point, SUN_DIRECTION, PLANET_CENTER, ATMOSPHERE_RADIUS).y;
-        let sun_ray_optical_depth = optical_depth(scatter_point, SUN_DIRECTION, sun_ray_length);
+        //if intersects planet, skip
+        //if goes out into space, use infinite integration approximation
+        let sun_blocked = ray_sphere(scatter_point,SUN_DIRECTION,PLANET_CENTER,PLANET_RADIUS).x > 0;
         let local_density = rayleigh_density(scatter_point);
-        let transmittance = exp(-RAYLEIGH_BETA * (sun_ray_optical_depth + view_ray_optical_depth));
+        if !sun_blocked {
+            let sun_ray_length = ray_sphere(scatter_point, SUN_DIRECTION, PLANET_CENTER, ATMOSPHERE_RADIUS).y;
+            let sun_ray_optical_depth = optical_depth(scatter_point, SUN_DIRECTION, sun_ray_length);
+            let transmittance = exp(-RAYLEIGH_BETA * (sun_ray_optical_depth + view_ray_optical_depth));
+            inscattered_light += local_density * transmittance * step_size;
+        }
 
-        inscattered_light += local_density * transmittance * step_size;
         view_ray_optical_depth += local_density * step_size;
         scatter_point += ray_dir * step_size;
     }
