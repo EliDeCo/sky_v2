@@ -15,7 +15,8 @@ struct AtmosphereSettings {
     cos_sun_angular_radius: f32,
     atmosphere_radius: f32,
     planet_center: vec3f,
-    sun_intensity: f32
+    solar_irradiance: f32,
+    solar_radiance: f32
 }
 
 @group(0) @binding(0) 
@@ -54,7 +55,7 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
     let atmosphere_intersections = ray_sphere(ray_origin, ray_dir, info.planet_center, info.atmosphere_radius);
     // atmosphere is missed entirely, render space
     if all(atmosphere_intersections == vec2f(-1.0, -1.0)) {
-        return vec4f(tonemap(vec3f(sun_disk(ray_dir)) * info.sun_intensity), 1.0);
+        return vec4f(tonemap(vec3f(sun_disk(ray_dir))), 1.0);
     }
 
     var start_point = ray_origin;
@@ -79,12 +80,12 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
         let diffuse   = max(dot(normal, info.sun_direction), 0.0);
         background_color = info.planet_color * (0.1 + diffuse);  
     } else {
-        background_color = vec3f(sun_disk(ray_dir)) * info.sun_intensity;
+        background_color = vec3f(sun_disk(ray_dir));
     }
 
     let phase = rayleigh_phase(dot(ray_dir, -info.sun_direction));
     var inscattered_light = calculate_light(start_point, ray_dir, dist_through_atmosphere);
-    inscattered_light *= info.rayleigh_beta * phase * info.sun_intensity;
+    inscattered_light *= info.rayleigh_beta * phase * info.solar_irradiance;
 
     let view_ray_optical_depth = optical_depth(start_point, ray_dir, dist_through_atmosphere);
     let total_view_ray_transmittance = exp(-info.rayleigh_beta * view_ray_optical_depth);
@@ -167,5 +168,7 @@ fn sun_disk(ray_dir: vec3f) -> f32 {
     let cos_theta = dot(ray_dir, info.sun_direction);
 
     let edge = fwidth(cos_theta);
-    return smoothstep(info.cos_sun_angular_radius - edge, info.cos_sun_angular_radius + edge, cos_theta);
+    let disk = smoothstep(info.cos_sun_angular_radius - edge, info.cos_sun_angular_radius + edge, cos_theta);
+
+    return disk * info.solar_radiance;
 }

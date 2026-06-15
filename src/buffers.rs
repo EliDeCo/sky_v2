@@ -34,7 +34,8 @@ pub struct AtmosphereSettings {
     cos_sun_angular_radius: f32,
     atmosphere_radius: f32,
     planet_center: Vec3,
-    sun_intensity: f32
+    solar_irradiance: f32,
+    solar_radiance: f32
 }
 
 pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
@@ -68,6 +69,8 @@ pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
         })
         .collect();
 
+    let brightness = parsed_values[10];
+
     settings.atmosphere_height = parsed_values[0];
     settings.num_rayleigh_steps = parsed_values[1] as i32;
     settings.num_optical_depth_steps = parsed_values[2] as i32;
@@ -79,5 +82,7 @@ pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
     settings.cos_sun_angular_radius = (atan(parsed_values[8] / parsed_values[7])).cos();
     settings.atmosphere_radius = settings.planet_radius + settings.atmosphere_height;
     settings.planet_center = Vec3::new(0.0, -settings.planet_radius, 0.0);
-    settings.sun_intensity = 20.0;
+    settings.solar_irradiance = parsed_values[9] * brightness;
+    let sun_solid_angle = std::f32::consts::TAU * (1. - settings.cos_sun_angular_radius);
+    settings.solar_radiance = settings.solar_irradiance / sun_solid_angle;
 }
