@@ -27,13 +27,16 @@ fn main() {
         .add_plugins(FullscreenFragmentPlugin::new("shaders/fragment.wgsl"))
         .register_uniform_buffer::<Uniform>(0, 0)
         .init_resource::<Uniform>()
+        .register_uniform_buffer::<AtmosphereSettings>(1, 0)
+        .init_resource::<AtmosphereSettings>()
         //run
-        .add_systems(Startup, setup)
+        .add_systems(Startup, (setup, update_settings))
         .add_systems(Update, update_uniform)
         .run();
 }
 
 fn setup(mut commands: Commands) {
+    //camera
     commands.spawn((
         Camera3d::default(),
         Msaa::Off,
@@ -41,4 +44,3 @@ fn setup(mut commands: Commands) {
         Transform::from_xyz(0.0, 0.001, 0.0),
     ));
 }
-

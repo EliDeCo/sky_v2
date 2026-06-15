@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{math::ops::atan, prelude::*};
 use bevy_fragment_shader_plugin::prelude::*;
 
 #[derive(Resource, ShaderType, Clone, Default)]
@@ -19,4 +19,65 @@ pub fn update_uniform(
 
     uniform.resolution = Vec2::new(window.width(), window.height());
     uniform.world_from_clip = world_from_clip;
+}
+
+#[derive(Resource, ShaderType, Clone, Default)]
+pub struct AtmosphereSettings {
+    atmosphere_height: f32,
+    num_rayleigh_steps: i32,
+    num_optical_depth_steps: i32,
+    planet_radius: f32,
+    planet_color: Vec3,
+    scale_height: f32,
+    rayleigh_beta: Vec3,
+    sun_direction: Vec3,
+    sun_angular_diameter: f32,
+    atmosphere_radius: f32,
+    planet_center: Vec3,
+    sun_intensity: f32
+}
+
+pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
+    let mut reader = csv::Reader::from_path("configs.csv").unwrap();
+    let values: Vec<String> = reader
+        .records()
+        .filter_map(|r| r.ok())
+        .filter_map(|r| r.get(1).map(|s| s.to_string()))
+        .collect();
+
+    let parts: Vec<f32> = values[4]
+        .split(",")
+        .map(|x| x.trim().parse().unwrap())
+        .collect();
+    let planet_color = Vec3::new(parts[0], parts[1], parts[2]);
+
+    let parts: Vec<f32> = values[6]
+        .split(",")
+        .map(|x| x.trim().parse().unwrap())
+        .collect();
+    let rayleigh_beta = Vec3::new(parts[0], parts[1], parts[2]);
+
+    let parsed_values: Vec<f32> = values
+        .into_iter()
+        .enumerate()
+        .map(|(i, x)| {
+            if i == 4 || i == 6 {
+                return 0.0;
+            }
+            return x.trim().parse().unwrap();
+        })
+        .collect();
+
+    settings.atmosphere_height = parsed_values[0];
+    settings.num_rayleigh_steps = parsed_values[1] as i32;
+    settings.num_optical_depth_steps = parsed_values[2] as i32;
+    settings.planet_radius = parsed_values[3];
+    settings.planet_color = planet_color;
+    settings.scale_height = parsed_values[5];
+    settings.rayleigh_beta = rayleigh_beta;
+    settings.sun_direction = Vec3::new(0.0, 0.1, -1.0).normalize();
+    settings.sun_angular_diameter = 2.*atan(parsed_values[8] / parsed_values[7]);
+    settings.atmosphere_radius = settings.planet_radius + settings.atmosphere_height;
+    settings.planet_center = Vec3::new(0.0, -settings.planet_radius, 0.0);
+    settings.sun_intensity = 20.0;
 }

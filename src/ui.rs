@@ -180,8 +180,7 @@ fn dropdown_toggle_system(
     for interaction in &interaction_q {
         if *interaction == Interaction::Pressed {
             let new_open = !state.open;
-            if let (Ok(mut list), Ok(mut backdrop)) =
-                (list_q.single_mut(), backdrop_q.single_mut())
+            if let (Ok(mut list), Ok(mut backdrop)) = (list_q.single_mut(), backdrop_q.single_mut())
             {
                 set_dropdown_open(new_open, &mut list, &mut backdrop, &mut state);
             }
@@ -204,8 +203,7 @@ fn dropdown_option_system(
             if let Ok(mut label) = label_q.single_mut() {
                 *label = Text::new(present_mode_label(option.mode));
             }
-            if let (Ok(mut list), Ok(mut backdrop)) =
-                (list_q.single_mut(), backdrop_q.single_mut())
+            if let (Ok(mut list), Ok(mut backdrop)) = (list_q.single_mut(), backdrop_q.single_mut())
             {
                 set_dropdown_open(false, &mut list, &mut backdrop, &mut state);
             }
@@ -221,8 +219,7 @@ fn dropdown_backdrop_system(
 ) {
     for interaction in &interaction_q {
         if *interaction == Interaction::Pressed {
-            if let (Ok(mut list), Ok(mut backdrop)) =
-                (list_q.single_mut(), backdrop_q.single_mut())
+            if let (Ok(mut list), Ok(mut backdrop)) = (list_q.single_mut(), backdrop_q.single_mut())
             {
                 set_dropdown_open(false, &mut list, &mut backdrop, &mut state);
             }
@@ -268,9 +265,6 @@ fn update_coords_text(
 ) {
     let pos = camera_q.translation();
     if let Ok(mut text) = text_q.single_mut() {
-        *text = Text::new(format!(
-            "x: {:.2}  y: {:.2}  z: {:.2}",
-            pos.x, pos.y, pos.z
-        ));
+        *text = Text::new(format!("x: {:.2}  y: {:.2}  z: {:.2}", pos.x, pos.y, pos.z));
     }
 }
