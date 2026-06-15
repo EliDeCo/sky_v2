@@ -4,9 +4,11 @@ num_rayleigh_steps,16
 num_optical_depth_steps,16
 planet_radius,6378.0
 planet_color,"0.196, 0.459, 0.145"
-scale_height,8.0
+rayleigh_scale_height,8.0
 rayleigh_beta,"5.8e-3, 13.5e-3, 33.1e-3"
 distance_to_sun,149597870.7
 sun_radius,695700
 solar_irradiance,1361
 brightness,0.01
+mie_beta,21e-3
+mie_scale_height,1.2

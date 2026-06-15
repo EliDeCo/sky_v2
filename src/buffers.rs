@@ -28,61 +28,37 @@ pub struct AtmosphereSettings {
     num_optical_depth_steps: i32,
     planet_radius: f32,
     planet_color: Vec3,
-    scale_height: f32,
+    rayleigh_scale_height: f32,
     rayleigh_beta: Vec3,
     sun_direction: Vec3,
     cos_sun_angular_radius: f32,
     atmosphere_radius: f32,
     planet_center: Vec3,
     solar_irradiance: f32,
-    solar_radiance: f32
+    solar_radiance: f32,
+    mie_beta: f32,
+    mie_scale_height: f32,
+    ozone_beta: Vec3,
+    ozone_profile: Vec3, 
 }
 
 pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
-    let mut reader = csv::Reader::from_path("configs.csv").unwrap();
-    let values: Vec<String> = reader
-        .records()
-        .filter_map(|r| r.ok())
-        .filter_map(|r| r.get(1).map(|s| s.to_string()))
-        .collect();
-
-    let parts: Vec<f32> = values[4]
-        .split(",")
-        .map(|x| x.trim().parse().unwrap())
-        .collect();
-    let planet_color = Vec3::new(parts[0], parts[1], parts[2]);
-
-    let parts: Vec<f32> = values[6]
-        .split(",")
-        .map(|x| x.trim().parse().unwrap())
-        .collect();
-    let rayleigh_beta = Vec3::new(parts[0], parts[1], parts[2]);
-
-    let parsed_values: Vec<f32> = values
-        .into_iter()
-        .enumerate()
-        .map(|(i, x)| {
-            if i == 4 || i == 6 {
-                return 0.0;
-            }
-            return x.trim().parse().unwrap();
-        })
-        .collect();
-
-    let brightness = parsed_values[10];
-
-    settings.atmosphere_height = parsed_values[0];
-    settings.num_rayleigh_steps = parsed_values[1] as i32;
-    settings.num_optical_depth_steps = parsed_values[2] as i32;
-    settings.planet_radius = parsed_values[3];
-    settings.planet_color = planet_color;
-    settings.scale_height = parsed_values[5];
-    settings.rayleigh_beta = rayleigh_beta;
-    settings.sun_direction = Vec3::new(0.0, 0.1, -1.0).normalize();
-    settings.cos_sun_angular_radius = (atan(parsed_values[8] / parsed_values[7])).cos();
-    settings.atmosphere_radius = settings.planet_radius + settings.atmosphere_height;
+    settings.atmosphere_height = 100.0;
+    settings.num_rayleigh_steps = 16;
+    settings.num_optical_depth_steps = 16;
+    settings.planet_radius = 6378.0;
+    settings.planet_color = Vec3::new(0.196, 0.459, 0.145);
+    settings.rayleigh_scale_height = 8.0;
+    settings.rayleigh_beta = Vec3::new(5.8e-3, 13.5e-3, 33.1e-3);
+    settings.sun_direction = Vec3::new(0.0, 0.025, -1.0).normalize();
+    settings.cos_sun_angular_radius = (atan(695700. / 149597870.7)).cos(); //solar_radius / distance_to_sun
+    settings.atmosphere_radius = settings.planet_radius + settings.atmosphere_height; 
     settings.planet_center = Vec3::new(0.0, -settings.planet_radius, 0.0);
-    settings.solar_irradiance = parsed_values[9] * brightness;
+    settings.solar_irradiance = 1361. * 0.01; //solar_irradiance * brightness
     let sun_solid_angle = std::f32::consts::TAU * (1. - settings.cos_sun_angular_radius);
     settings.solar_radiance = settings.solar_irradiance / sun_solid_angle;
+    settings.mie_beta = 21e-3;
+    settings.mie_scale_height = 1.2;
+    settings.ozone_beta = Vec3::new(3.426, 8.298, 0.356) * 0.06 * 1e-2;
+    settings.ozone_profile = Vec3::new(15., 22., 35.); //lower bound, highest concentration, upper bound (km)
 }

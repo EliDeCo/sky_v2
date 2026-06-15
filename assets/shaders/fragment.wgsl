@@ -1,3 +1,5 @@
+const PI = 3.14159265359;
+
 struct Uniform {
     resolution: vec2f,
     world_from_clip: mat4x4f,
@@ -9,14 +11,18 @@ struct AtmosphereSettings {
     num_optical_depth_steps: i32,
     planet_radius: f32,
     planet_color: vec3f,
-    scale_height: f32,
+    rayleigh_scale_height: f32,
     rayleigh_beta: vec3f,
     sun_direction: vec3f,
     cos_sun_angular_radius: f32,
     atmosphere_radius: f32,
     planet_center: vec3f,
     solar_irradiance: f32,
-    solar_radiance: f32
+    solar_radiance: f32,
+    mie_beta: f32,
+    mie_scale_height: f32,
+    ozone_beta: vec3f,
+    ozone_profile: vec3f, 
 }
 
 @group(0) @binding(0) 
@@ -98,29 +104,30 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
 
 fn calculate_light(ray_origin: vec3f, ray_dir: vec3f, dist_through_atmosphere: f32) -> vec3f {
     let step_size = dist_through_atmosphere / f32(info.num_rayleigh_steps);
-    var scatter_point = ray_origin;
+    var current_point = ray_origin;
     var inscattered_light = vec3f(0);
     var view_ray_optical_depth = 0.0;
 
     //try to replace with integral
     for (var i = 0; i < info.num_rayleigh_steps; i += 1) {
+        let height = length(current_point - info.planet_center) - info.planet_radius;
         //if intersects planet, skip
         //if goes out into space, use infinite integration approximation (eventually)
-        let sun_blocked = ray_sphere(scatter_point,info.sun_direction,info.planet_center,info.planet_radius).x > 0;
-        let local_density = rayleigh_density(scatter_point);
+        let sun_blocked = ray_sphere(current_point,info.sun_direction,info.planet_center,info.planet_radius).x > 0;
+        let local_rayleigh_density = rayleigh_density(height);
         if !sun_blocked {
-            let sun_ray_length = ray_sphere(scatter_point, info.sun_direction, info.planet_center, info.atmosphere_radius).y;
-            let sun_ray_optical_depth = optical_depth(scatter_point, info.sun_direction, sun_ray_length);
+            let sun_ray_length = ray_sphere(current_point, info.sun_direction, info.planet_center, info.atmosphere_radius).y;
+            let sun_ray_optical_depth = optical_depth(current_point, info.sun_direction, sun_ray_length);
             let transmittance = exp(-info.rayleigh_beta * (sun_ray_optical_depth + view_ray_optical_depth));
-            inscattered_light += local_density * transmittance * step_size;
+            inscattered_light += local_rayleigh_density * transmittance * step_size;
         }
 
-        view_ray_optical_depth += local_density * step_size;
-        scatter_point += ray_dir * step_size;
+        view_ray_optical_depth += local_rayleigh_density * step_size;
+        current_point += ray_dir * step_size;
     }
 
     return inscattered_light;
-} 
+}
 
 // Returns vec2(t_enter, t_exit). On miss, both components are -1.0.
 fn ray_sphere(origin: vec3f, dir: vec3f, center: vec3f, radius: f32) -> vec2f {
@@ -137,27 +144,51 @@ fn ray_sphere(origin: vec3f, dir: vec3f, center: vec3f, radius: f32) -> vec2f {
 
 //calculates the optical depth along a ray, essentially the average density across the ray
 fn optical_depth(origin: vec3f, dir: vec3f, ray_length: f32) -> f32 {
-    var sample_point = origin;
+    var current_point = origin;
     let step_size = ray_length / f32(info.num_optical_depth_steps);
     var optical_depth = 0.0;
 
     //this can also likely be replaced with an integral
     for (var i = 0; i < info.num_optical_depth_steps; i += 1) {
-        optical_depth += rayleigh_density(sample_point) * step_size;
-        sample_point += dir * step_size;
+        let height = length(current_point - info.planet_center) - info.planet_radius;
+        optical_depth += rayleigh_density(height) * step_size;
+        current_point += dir * step_size;
     }
 
     return optical_depth;
 }
 
 //calculates the density of the atmosphere at a given point for use in rayleigh scattering.
-fn rayleigh_density(point: vec3f) -> f32 {
-    let height = length(point - info.planet_center) - info.planet_radius;
-    return exp(-max(0.0, height) / info.scale_height);
+fn rayleigh_density(height: f32) -> f32 {
+    return exp(-max(0.0, height) / info.rayleigh_scale_height);
 }
 
 fn rayleigh_phase(cos_theta: f32) -> f32 {
-    return (3.0 / (16.0 * 3.14159)) * (1.0 + cos_theta * cos_theta);
+    return (3.0 / (16.0 * PI)) * (1.0 + cos_theta * cos_theta);
+}
+
+fn mie_density(height: f32) -> f32 {
+    return exp(-max(0.0, height) / info.mie_scale_height);
+}
+
+fn mie_phase(cos_theta: f32) -> f32 {
+    let g = 0.76;
+    let denom = 1 + g * g - 2 * g * cos_theta;
+    return (1 - g *  g) / (4 * PI * pow(denom, 1.5));
+}
+
+fn ozone_density(height: f32) -> f32 {
+    let lower = info.ozone_profile.x;
+    let midpoint = info.ozone_profile.y;
+    let upper = info.ozone_profile.z;
+
+    if height < lower || height > upper {
+        return 0;
+    } else if height < midpoint {
+        return (height - lower) / (midpoint - lower);
+    } else {
+        return (upper - height) / (upper - midpoint);
+    }
 }
 
 fn tonemap(color: vec3f) -> vec3f {
