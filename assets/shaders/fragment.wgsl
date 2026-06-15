@@ -12,7 +12,7 @@ struct AtmosphereSettings {
     scale_height: f32,
     rayleigh_beta: vec3f,
     sun_direction: vec3f,
-    sun_angular_diameter: f32,
+    cos_sun_angular_radius: f32,
     atmosphere_radius: f32,
     planet_center: vec3f,
     sun_intensity: f32
@@ -54,8 +54,9 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
     let atmosphere_intersections = ray_sphere(ray_origin, ray_dir, info.planet_center, info.atmosphere_radius);
     // atmosphere is missed entirely, render space
     if all(atmosphere_intersections == vec2f(-1.0, -1.0)) {
-        return vec4f(0.0, 0.0, 0.0, 1.0);
+        return vec4f(tonemap(vec3f(sun_disk(ray_dir)) * info.sun_intensity), 1.0);
     }
+
     var start_point = ray_origin;
     let outside_atmosphere = length(ray_origin - info.planet_center) > info.atmosphere_radius;
     //if ray starts outside atmosphere, move start point to entry point
@@ -77,6 +78,8 @@ fn frag_main(@builtin(position) frag_coords: vec4<f32>) -> @location(0) vec4<f32
         let normal    = normalize(hit_point - info.planet_center);
         let diffuse   = max(dot(normal, info.sun_direction), 0.0);
         background_color = info.planet_color * (0.1 + diffuse);  
+    } else {
+        background_color = vec3f(sun_disk(ray_dir)) * info.sun_intensity;
     }
 
     let phase = rayleigh_phase(dot(ray_dir, -info.sun_direction));
@@ -158,4 +161,11 @@ fn rayleigh_phase(cos_theta: f32) -> f32 {
 
 fn tonemap(color: vec3f) -> vec3f {
     return vec3f(1) - exp(-color);
+}
+
+fn sun_disk(ray_dir: vec3f) -> f32 {
+    let cos_theta = dot(ray_dir, info.sun_direction);
+
+    let edge = fwidth(cos_theta);
+    return smoothstep(info.cos_sun_angular_radius - edge, info.cos_sun_angular_radius + edge, cos_theta);
 }

@@ -31,7 +31,7 @@ pub struct AtmosphereSettings {
     scale_height: f32,
     rayleigh_beta: Vec3,
     sun_direction: Vec3,
-    sun_angular_diameter: f32,
+    cos_sun_angular_radius: f32,
     atmosphere_radius: f32,
     planet_center: Vec3,
     sun_intensity: f32
@@ -76,7 +76,7 @@ pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
     settings.scale_height = parsed_values[5];
     settings.rayleigh_beta = rayleigh_beta;
     settings.sun_direction = Vec3::new(0.0, 0.1, -1.0).normalize();
-    settings.sun_angular_diameter = 2.*atan(parsed_values[8] / parsed_values[7]);
+    settings.cos_sun_angular_radius = (atan(parsed_values[8] / parsed_values[7])).cos();
     settings.atmosphere_radius = settings.planet_radius + settings.atmosphere_height;
     settings.planet_center = Vec3::new(0.0, -settings.planet_radius, 0.0);
     settings.sun_intensity = 20.0;
