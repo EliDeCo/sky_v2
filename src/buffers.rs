@@ -43,13 +43,13 @@ pub struct AtmosphereSettings {
     ozone_beta: Vec3,
     ozone_profile: Vec3,
 }
-
+//TODO: Replace scale height with inverse scale height
 pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
     //all length units in km
     //irradiance in W/m^2
     settings.atmosphere_height = 100.0;
-    settings.num_view_ray_steps = 10;
-    settings.num_sun_ray_steps = 10;
+    settings.num_view_ray_steps = 64;
+    settings.num_sun_ray_steps = 64;
     settings.planet_radius = 6378.0;
     settings.planet_color = Vec3::new(0.196, 0.459, 0.145);
     settings.rayleigh_scale_height = 8.0;
@@ -57,7 +57,7 @@ pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
     settings.cos_sun_angular_radius = (atan(695700. / 149597870.7)).cos(); //solar_radius / distance_to_sun
     settings.atmosphere_radius = settings.planet_radius + settings.atmosphere_height; 
     settings.planet_center = Vec3::new(0.0, -settings.planet_radius, 0.0);
-    settings.solar_irradiance = 1361. * 0.02; //solar_irradiance * brightness (where brightness is just a stylistic term to reduce blown out colors)
+    settings.solar_irradiance = 1361. * 0.01; //solar_irradiance * brightness (where brightness is just a stylistic term to reduce blown out colors)
     let sun_solid_angle = std::f32::consts::TAU * (1. - settings.cos_sun_angular_radius);
     settings.solar_radiance = settings.solar_irradiance / sun_solid_angle;
     settings.mie_beta = 3e-3; //same for all wavelengths
