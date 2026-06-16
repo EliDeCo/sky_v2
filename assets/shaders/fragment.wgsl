@@ -24,7 +24,8 @@ struct AtmosphereSettings {
     mie_g: f32,
     mie_scale_height: f32,
     ozone_beta: vec3f,
-    ozone_profile: vec3f, 
+    ozone_profile: vec3f,
+    gauss_laguerre_params: array<vec4f, 16>
 }
 
 @group(0) @binding(0) 
@@ -168,6 +169,57 @@ fn optical_depth(origin: vec3f, dir: vec3f, ray_length: f32) -> vec3f {
     }
 
     return step_size * vec3f(view_optical_depth_rayleigh,view_optical_depth_mie,view_optical_depth_ozone);
+}
+
+fn optical_depth_gauss_laguerre(origin: vec3f, dir: vec3f, ray_length: f32) -> vec3f {
+    //ozone done the normal way
+    var current_point = origin;
+    let step_size = ray_length / f32(info.num_sun_ray_steps);
+    let step = dir * step_size;
+    var view_optical_depth_ozone = 0.0;
+
+    for (var i = 0; i < info.num_sun_ray_steps; i += 1) {
+        let height = length(current_point - info.planet_center) - info.planet_radius;
+        view_optical_depth_ozone += ozone_density(height);
+
+        current_point += step;
+    }
+
+    //new method for other two
+    let h   = info.rayleigh_scale_height;
+    let w   = origin - info.planet_center;  // o - c
+    let bh  = 2.0 * dot(w, dir) / h;              // linear coeff in s
+    let c   = dot(w, w) / (h * h);                // |o-c|^2 / H^2
+    let rh0 = info.planet_radius / h;             // R / H
+
+    var integral_rayleigh = 0.0;
+    for (var i = 0u; i < 16u; i += 1u) {
+        let p = info.gauss_laguerre_params[i];    // .y, .w are W = weight*exp(node)
+        integral_rayleigh += p.y * exp(rh0 - sqrt(p.x*p.x + bh*p.x + c));
+        integral_rayleigh += p.w * exp(rh0 - sqrt(p.z*p.z + bh*p.z + c));
+    }
+    integral_rayleigh *= h;   // from x = H*s substitution
+
+    //redo for mie
+    let h2   = info.mie_scale_height;
+    let w2   = origin - info.planet_center;
+    let bh2  = 2.0 * dot(w2, dir) / h2;          
+    let c2   = dot(w2, w2) / (h2 * h2);         
+    let rh02 = info.planet_radius / h2;       
+
+    var integral_mie = 0.0;
+    for (var i = 0u; i < 16u; i += 1u) {
+        let p = info.gauss_laguerre_params[i];   
+        integral_mie += p.y * exp(rh02 - sqrt(p.x*p.x + bh2*p.x + c2));
+        integral_mie += p.w * exp(rh02 - sqrt(p.z*p.z + bh2*p.z + c2));
+    }
+    integral_mie *= h2;  
+
+    return vec3f(integral_rayleigh, integral_mie, step_size * view_optical_depth_ozone);
+}
+
+fn g(t: f32, a: f32, b: f32, c: f32, h: f32) -> f32 {
+    return exp(t - sqrt(t*t + b*h*t + c));  
 }
 
 // Returns vec2(t_enter, t_exit). On miss, both components are -1.0.
