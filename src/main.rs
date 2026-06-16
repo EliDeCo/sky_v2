@@ -29,9 +29,10 @@ fn main() {
         .init_resource::<Uniform>()
         .register_uniform_buffer::<AtmosphereSettings>(1, 0)
         .init_resource::<AtmosphereSettings>()
+        .init_resource::<SunPos>()
         //run
         .add_systems(Startup, (setup, update_settings))
-        .add_systems(Update, update_uniform)
+        .add_systems(Update, (update_sun, update_uniform))
         .run();
 }
 

@@ -54,11 +54,10 @@ pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
     settings.planet_color = Vec3::new(0.196, 0.459, 0.145);
     settings.rayleigh_scale_height = 8.0;
     settings.rayleigh_beta = Vec3::new(5.8e-3, 13.5e-3, 33.1e-3);
-    settings.sun_direction = Vec3::new(0.0, 0.01, -1.0).normalize();
     settings.cos_sun_angular_radius = (atan(695700. / 149597870.7)).cos(); //solar_radius / distance_to_sun
     settings.atmosphere_radius = settings.planet_radius + settings.atmosphere_height; 
     settings.planet_center = Vec3::new(0.0, -settings.planet_radius, 0.0);
-    settings.solar_irradiance = 1361. * 0.02; //solar_irradiance * brightness (wher brightness is just a stylistic term to reduce blown out colors)
+    settings.solar_irradiance = 1361. * 0.02; //solar_irradiance * brightness (where brightness is just a stylistic term to reduce blown out colors)
     let sun_solid_angle = std::f32::consts::TAU * (1. - settings.cos_sun_angular_radius);
     settings.solar_radiance = settings.solar_irradiance / sun_solid_angle;
     settings.mie_beta = 3e-3; //same for all wavelengths
@@ -67,4 +66,24 @@ pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
     settings.mie_scale_height = 1.2;
     settings.ozone_beta = Vec3::new(3.426, 8.298, 0.356) * 0.06 * 1e-2;
     settings.ozone_profile = Vec3::new(15., 22., 35.); //lower bound, highest concentration, upper bound
+}
+
+
+#[derive(Resource)]
+pub struct SunPos(Vec3);
+
+impl Default for SunPos {
+    fn default() -> Self {
+        SunPos(Vec3::new(0.0, 0.0, -1.0))
+    }
+}
+
+pub fn update_sun(mut sun: ResMut<SunPos>, mut settings: ResMut<AtmosphereSettings>, time: Res<Time>) {
+    // Axis of rotation lives mostly along x, tilted slightly toward y.
+    let axis = Vec3::new(1.0, 0.3, 0.0).normalize();
+    let angular_speed = 0.1; // radians per second
+    let angle = time.elapsed_secs() * angular_speed;
+
+    sun.0 = Quat::from_axis_angle(axis, angle) * Vec3::new(0.0, 0.0, -1.0);
+    settings.sun_direction = sun.0;
 }
