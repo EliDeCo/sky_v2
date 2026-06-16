@@ -4520,7 +4520,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sky_1"
+name = "sky_2"
 version = "0.1.0"
 dependencies = [
  "bevy",
