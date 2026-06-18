@@ -9,6 +9,7 @@ log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] 
 bevy_flycam = "*"
 bevy-fragment-shader-plugin = "0.1.1"
 bevy-fps-counter = "0.9.0"
+gauss-quad = "0.3.1"
 
 
 # Optimize the least for dev profiles to keep compile times down

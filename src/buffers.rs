@@ -1,5 +1,7 @@
 use bevy::{math::ops::atan, prelude::*};
 use bevy_fragment_shader_plugin::prelude::*;
+use std::num::NonZeroUsize;
+use gauss_quad::{FiniteAboveNegOneF64, GaussLaguerre};
 
 #[derive(Resource, ShaderType, Clone, Default)]
 pub struct Uniform {
@@ -42,8 +44,9 @@ pub struct AtmosphereSettings {
     mie_scale_height: f32,
     ozone_beta: Vec3,
     ozone_profile: Vec3,
+    gauss_laguerre_params: [Vec4; 16]
 }
-//TODO: Replace scale height with inverse scale height
+
 pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
     //all length units in km
     //irradiance in W/m^2
@@ -66,6 +69,22 @@ pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
     settings.mie_scale_height = 1.2;
     settings.ozone_beta = Vec3::new(3.426, 8.298, 0.356) * 0.06 * 1e-2;
     settings.ozone_profile = Vec3::new(15., 22., 35.); //lower bound, highest concentration, upper bound
+
+    //constants for density approximations
+    let degree = NonZeroUsize::new(32).unwrap();
+    let alpha = FiniteAboveNegOneF64::new(0.0).unwrap();
+
+    let quad = GaussLaguerre::new(degree, alpha);
+
+    settings.gauss_laguerre_params = quad
+        .into_iter()
+        .map(|x|vec2(x.0 as f32,(x.1 * x.0.exp()) as f32))
+        .collect::<Vec<Vec2>>()
+        .chunks_exact(2)
+        .map(|chunk|vec4(chunk[0].x,chunk[0].y,chunk[1].x,chunk[1].y))
+        .collect::<Vec<Vec4>>()
+        .try_into()
+        .unwrap();
 }
 
 
