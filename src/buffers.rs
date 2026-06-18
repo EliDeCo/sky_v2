@@ -1,7 +1,7 @@
 use bevy::{math::ops::atan, prelude::*};
 use bevy_fragment_shader_plugin::prelude::*;
 use std::num::NonZeroUsize;
-use gauss_quad::{FiniteAboveNegOneF64, GaussLaguerre};
+use gauss_quad::GaussLegendre;
 
 #[derive(Resource, ShaderType, Clone, Default)]
 pub struct Uniform {
@@ -44,7 +44,7 @@ pub struct AtmosphereSettings {
     mie_scale_height: f32,
     ozone_beta: Vec3,
     ozone_profile: Vec3,
-    gauss_laguerre_params: [Vec4; 16]
+    gauss_legendre_params: [Vec4; 16]
 }
 
 pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
@@ -70,18 +70,15 @@ pub fn update_settings(mut settings: ResMut<AtmosphereSettings>) {
     settings.ozone_beta = Vec3::new(3.426, 8.298, 0.356) * 0.06 * 1e-2;
     settings.ozone_profile = Vec3::new(15., 22., 35.); //lower bound, highest concentration, upper bound
 
-    //constants for density approximations
     let degree = NonZeroUsize::new(32).unwrap();
-    let alpha = FiniteAboveNegOneF64::new(0.0).unwrap();
+    let quad = GaussLegendre::new(degree);
 
-    let quad = GaussLaguerre::new(degree, alpha);
-
-    settings.gauss_laguerre_params = quad
+    settings.gauss_legendre_params = quad
         .into_iter()
-        .map(|x|vec2(x.0 as f32,(x.1 * x.0.exp()) as f32))
+        .map(|(node, weight)| vec2(node as f32, weight as f32))
         .collect::<Vec<Vec2>>()
         .chunks_exact(2)
-        .map(|chunk|vec4(chunk[0].x,chunk[0].y,chunk[1].x,chunk[1].y))
+        .map(|chunk| vec4(chunk[0].x, chunk[0].y, chunk[1].x, chunk[1].y))
         .collect::<Vec<Vec4>>()
         .try_into()
         .unwrap();

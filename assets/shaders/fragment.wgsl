@@ -25,7 +25,7 @@ struct AtmosphereSettings {
     mie_scale_height: f32,
     ozone_beta: vec3f,
     ozone_profile: vec3f,
-    gauss_laguerre_params: array<vec4f, 16>
+    gauss_legendre_params: array<vec4f, 16>
 }
 
 @group(0) @binding(0) 
@@ -122,7 +122,7 @@ fn calculate_light(ray_origin: vec3f, ray_dir: vec3f, dist_through_atmosphere: f
 
         if !sun_blocked {
             let sun_ray_length = ray_sphere(current_point, info.sun_direction, info.planet_center, info.atmosphere_radius).y;
-            let sun_ray_optical_depth = optical_depth(current_point, info.sun_direction, sun_ray_length);
+            let sun_ray_optical_depth = optical_depth_gauss_legendre(current_point, info.sun_direction, sun_ray_length);
 
             let tau = info.rayleigh_beta * (view_optical_depth_rayleigh + sun_ray_optical_depth.x)
                 + info.mie_beta_extinction * vec3f(info.mie_beta) * (view_optical_depth_mie + sun_ray_optical_depth.y)
@@ -171,55 +171,60 @@ fn optical_depth(origin: vec3f, dir: vec3f, ray_length: f32) -> vec3f {
     return step_size * vec3f(view_optical_depth_rayleigh,view_optical_depth_mie,view_optical_depth_ozone);
 }
 
-fn optical_depth_gauss_laguerre(origin: vec3f, dir: vec3f, ray_length: f32) -> vec3f {
-    //ozone done the normal way
+fn optical_depth_gauss_legendre(origin: vec3f, dir: vec3f, ray_length: f32) -> vec3f {
+    // Ozone: unchanged naive march
     var current_point = origin;
     let step_size = ray_length / f32(info.num_sun_ray_steps);
     let step = dir * step_size;
-    var view_optical_depth_ozone = 0.0;
-
+    var ozone_od = 0.0;
     for (var i = 0; i < info.num_sun_ray_steps; i += 1) {
-        let height = length(current_point - info.planet_center) - info.planet_radius;
-        view_optical_depth_ozone += ozone_density(height);
-
+        ozone_od += ozone_density(length(current_point - info.planet_center) - info.planet_radius);
         current_point += step;
     }
 
-    //new method for other two
-    let h   = info.rayleigh_scale_height;
-    let w   = origin - info.planet_center;  // o - c
-    let bh  = 2.0 * dot(w, dir) / h;              // linear coeff in s
-    let c   = dot(w, w) / (h * h);                // |o-c|^2 / H^2
-    let rh0 = info.planet_radius / h;             // R / H
+    let w = origin - info.planet_center;
 
-    var integral_rayleigh = 0.0;
+    // Rayleigh
+    let h_r   = info.rayleigh_scale_height;
+    let bh_r  = 2.0 * dot(w, dir) / h_r;
+    let c_r   = dot(w, w) / (h_r * h_r);
+    let rh0_r = info.planet_radius / h_r;
+    let L_r   = max(-0.5 * bh_r, 1.0);
+    let ll_r  = log(2.0 * L_r);
+
+    var ray_od = 0.0;
     for (var i = 0u; i < 16u; i += 1u) {
-        let p = info.gauss_laguerre_params[i];    // .y, .w are W = weight*exp(node)
-        integral_rayleigh += p.y * exp(rh0 - sqrt(p.x*p.x + bh*p.x + c));
-        integral_rayleigh += p.w * exp(rh0 - sqrt(p.z*p.z + bh*p.z + c));
+        let p = info.gauss_legendre_params[i];
+
+        let x1  = L_r * (1.0 + p.x) / (1.0 - p.x);
+        ray_od += p.y * exp(ll_r - 2.0 * log(1.0 - p.x) + rh0_r - sqrt(x1*x1 + bh_r*x1 + c_r));
+
+        let x2  = L_r * (1.0 + p.z) / (1.0 - p.z);
+        ray_od += p.w * exp(ll_r - 2.0 * log(1.0 - p.z) + rh0_r - sqrt(x2*x2 + bh_r*x2 + c_r));
     }
-    integral_rayleigh *= h;   // from x = H*s substitution
+    ray_od *= h_r;
 
-    //redo for mie
-    let h2   = info.mie_scale_height;
-    let w2   = origin - info.planet_center;
-    let bh2  = 2.0 * dot(w2, dir) / h2;          
-    let c2   = dot(w2, w2) / (h2 * h2);         
-    let rh02 = info.planet_radius / h2;       
+    // Mie
+    let h_m   = info.mie_scale_height;
+    let bh_m  = 2.0 * dot(w, dir) / h_m;
+    let c_m   = dot(w, w) / (h_m * h_m);
+    let rh0_m = info.planet_radius / h_m;
+    let L_m   = max(-0.5 * bh_m, 1.0);
+    let ll_m  = log(2.0 * L_m);
 
-    var integral_mie = 0.0;
+    var mie_od = 0.0;
     for (var i = 0u; i < 16u; i += 1u) {
-        let p = info.gauss_laguerre_params[i];   
-        integral_mie += p.y * exp(rh02 - sqrt(p.x*p.x + bh2*p.x + c2));
-        integral_mie += p.w * exp(rh02 - sqrt(p.z*p.z + bh2*p.z + c2));
+        let p = info.gauss_legendre_params[i];
+
+        let x1   = L_m * (1.0 + p.x) / (1.0 - p.x);
+        mie_od  += p.y * exp(ll_m - 2.0 * log(1.0 - p.x) + rh0_m - sqrt(x1*x1 + bh_m*x1 + c_m));
+
+        let x2   = L_m * (1.0 + p.z) / (1.0 - p.z);
+        mie_od  += p.w * exp(ll_m - 2.0 * log(1.0 - p.z) + rh0_m - sqrt(x2*x2 + bh_m*x2 + c_m));
     }
-    integral_mie *= h2;  
+    mie_od *= h_m;
 
-    return vec3f(integral_rayleigh, integral_mie, step_size * view_optical_depth_ozone);
-}
-
-fn g(t: f32, a: f32, b: f32, c: f32, h: f32) -> f32 {
-    return exp(t - sqrt(t*t + b*h*t + c));  
+    return vec3f(ray_od, mie_od, step_size * ozone_od);
 }
 
 // Returns vec2(t_enter, t_exit). On miss, both components are -1.0.
